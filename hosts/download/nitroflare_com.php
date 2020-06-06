@@ -5,9 +5,11 @@ if (!defined('RAPIDLEECH')) {
 	exit;
 }
 
-class nitroflare_com extends DownloadClass {
+class nitroflare_com extends DownloadClass
+{
 	private $page, $cookie = array(), $pA, $DLRegexp = '@https?://s\d+\.nitroflare\.com/d/\w+/[^\s\'\"<>]+@i';
-	public function Download($link) {
+	public function Download($link)
+	{
 		if (!preg_match('@https?://(?:www\.)?nitroflare\.com/view/(\w{15,})(?:/[^\s<>\'\"/]+)?@i', $link, $fid)) html_error('Invalid link?.');
 		$this->fid = $fid[1];
 		$this->link = $fid[0];
@@ -25,18 +27,14 @@ class nitroflare_com extends DownloadClass {
 		if (($_REQUEST['premium_acc'] == 'on' && ($this->pA || (!empty($GLOBALS['premium_acc']['nitroflare_com']['user']) && !empty($GLOBALS['premium_acc']['nitroflare_com']['pass']))))) {
 			$user = ($this->pA ? $_REQUEST['premium_user'] : $GLOBALS['premium_acc']['nitroflare_com']['user']);
 			$pass = ($this->pA ? $_REQUEST['premium_pass'] : $GLOBALS['premium_acc']['nitroflare_com']['pass']);
-			if ($this->pA && !empty($_POST['pA_encrypted'])) {
-				$user = decrypt(urldecode($user));
-				$pass = decrypt(urldecode($pass));
-				unset($_POST['pA_encrypted']);
-			}
-			return $this->CookieLogin($user, $pass);
+			return $this->ApiDownload($user, $pass);
 		} else return $this->FreeDL();
 	}
 
-	private function followLinkRedirect() {
+	private function followLinkRedirect()
+	{
 		if (!preg_match("@\nLocation: ((https?://(?:www\.)?nitroflare\.com)?/view/{$this->fid}/[^\s<>\'\"/]+)@i", $this->page, $redir)) return;
-		$redir = (empty($redir[2]) ? 'http://nitroflare.com'.$redir[1] : $redir[1]);
+		$redir = (empty($redir[2]) ? 'http://nitroflare.com' . $redir[1] : $redir[1]);
 
 
 		// Follow Redirect
@@ -46,12 +44,13 @@ class nitroflare_com extends DownloadClass {
 		$this->link = $GLOBALS['Referer'] = $redir;
 	}
 
-	private function FreeDL() {
+	private function FreeDL()
+	{
 		if (empty($_POST['step']) || $_POST['step'] != '1') {
 			$page = $this->GetPage($this->link, $this->cookie, array('goToFreePage' => 'Submit'));
 			$this->cookie = GetCookiesArr($page, $this->cookie);
 
-			$page = $this->GetPage($this->link.'/free', $this->cookie);
+			$page = $this->GetPage($this->link . '/free', $this->cookie);
 			$this->cookie = GetCookiesArr($page, $this->cookie);
 
 			if (!preg_match('@https?://(?:[^/]+\.)?(?:(?:google\.com/recaptcha/api)|(?:recaptcha\.net))/(?:(?:challenge)|(?:noscript))\?k=([\w\.\-]+)@i', $page, $pid)) html_error('CAPTCHA not found.');
@@ -67,7 +66,7 @@ class nitroflare_com extends DownloadClass {
 			$ajaxBody = trim($ajaxBody);
 			if ($ajaxBody != "\xEF\xBB\xBF1" && $ajaxBody != '1') html_error('Unexpected result at freeDownload request.');
 
-			if (preg_match('@id="CountDownTimer"\s+data-timer="(\d+)"@i', $page, $cD))$this->CountDown($cD[1]);
+			if (preg_match('@id="CountDownTimer"\s+data-timer="(\d+)"@i', $page, $cD)) $this->CountDown($cD[1]);
 
 			$data = $this->DefaultParamArr($this->link, $this->cookie, 1, 1);
 			$data['step'] = 1;
@@ -91,7 +90,8 @@ class nitroflare_com extends DownloadClass {
 		return $this->RedirectDownload($dl[0], urldecode(parse_url($dl[0], PHP_URL_PATH)));
 	}
 
-	private function PremiumDL() {
+	private function PremiumDL()
+	{
 		$page = $this->GetPage($this->link, $this->cookie);
 		$this->cookie = GetCookiesArr($page, $this->cookie);
 
@@ -100,7 +100,17 @@ class nitroflare_com extends DownloadClass {
 		return $this->RedirectDownload($dl[0], urldecode(parse_url($dl[0], PHP_URL_PATH)));
 	}
 
-	private function Login($user, $pass) {
+	private function ApiDownload($user, $pass)
+	{
+		$page = $this->GetPage("https://nitroflare.com/api/v2/getDownloadLink?user=" . urlencode($user) . "&premiumKey=" . urlencode($pass) . "&file={$this->fid}");
+		is_present($page, 'exceeds the daily download limit', 'Premium Account is out of bandwidth');
+		list($header, $jsonbody) = explode("\r\n\r\n", $page, 2);
+		$raw = json_decode($jsonbody, true)["result"];
+		if (!preg_match($this->DLRegexp, $raw["url"], $dl)) html_error('Download-Link Not Found.');
+		return $this->RedirectDownload($dl[0], $raw["name"]);
+	}
+	private function Login($user, $pass)
+	{
 		$purl = 'https://nitroflare.com/login';
 		if (!empty($_POST['step']) && $_POST['step'] == '1') {
 			$post = $this->verifyReCaptchav2();
@@ -161,7 +171,8 @@ class nitroflare_com extends DownloadClass {
 		return $this->PremiumDL();
 	}
 
-	private function IWillNameItLater($cookie, $decrypt=true) {
+	private function IWillNameItLater($cookie, $decrypt = true)
+	{
 		if (!is_array($cookie)) {
 			if (!empty($cookie)) return $decrypt ? decrypt(urldecode($cookie)) : urlencode(encrypt($cookie));
 			return '';
@@ -174,7 +185,8 @@ class nitroflare_com extends DownloadClass {
 		return array_combine($keys, $values);
 	}
 
-	private function CookieLogin($user, $pass, $filename = 'nitroflare_dl.php') {
+	private function CookieLogin($user, $pass, $filename = 'nitroflare_dl.php')
+	{
 		global $secretkey;
 		if (empty($user) || empty($pass)) html_error('Login Failed: User or Password is empty.');
 
@@ -185,10 +197,10 @@ class nitroflare_com extends DownloadClass {
 		$savedcookies = unserialize($file[1]);
 		unset($file);
 
-		$hash = hash('crc32b', $user.':'.$pass);
+		$hash = hash('crc32b', $user . ':' . $pass);
 		if (array_key_exists($hash, $savedcookies)) {
 			$_secretkey = $secretkey;
-			$secretkey = sha1($user.':'.$pass);
+			$secretkey = sha1($user . ':' . $pass);
 			$testCookie = (decrypt(urldecode($savedcookies[$hash]['enc'])) == 'OK') ? $this->IWillNameItLater($savedcookies[$hash]['cookie']) : '';
 			$secretkey = $_secretkey;
 			if (empty($testCookie) || (is_array($testCookie) && count($testCookie) < 1)) return $this->Login($user, $pass);
@@ -203,7 +215,8 @@ class nitroflare_com extends DownloadClass {
 		return $this->Login($user, $pass);
 	}
 
-	private function SaveCookies($user, $pass, $filename = 'nitroflare_dl.php') {
+	private function SaveCookies($user, $pass, $filename = 'nitroflare_dl.php')
+	{
 		global $secretkey;
 		$maxdays = 31; // Max days to keep cookies saved
 		$filename = DOWNLOAD_DIR . basename($filename);
@@ -215,9 +228,9 @@ class nitroflare_com extends DownloadClass {
 			// Remove old cookies
 			foreach ($savedcookies as $k => $v) if (time() - $v['time'] >= ($maxdays * 24 * 60 * 60)) unset($savedcookies[$k]);
 		} else $savedcookies = array();
-		$hash = hash('crc32b', $user.':'.$pass);
+		$hash = hash('crc32b', $user . ':' . $pass);
 		$_secretkey = $secretkey;
-		$secretkey = sha1($user.':'.$pass);
+		$secretkey = sha1($user . ':' . $pass);
 		$savedcookies[$hash] = array('time' => time(), 'enc' => urlencode(encrypt('OK')), 'cookie' => $this->IWillNameItLater($this->cookie, false));
 		$secretkey = $_secretkey;
 
@@ -225,7 +238,8 @@ class nitroflare_com extends DownloadClass {
 	}
 
 	// Special Function Called by verifyReCaptchav2 When Captcha Is Incorrect, To Allow Retry. - Required
-	protected function retryReCaptchav2() {
+	protected function retryReCaptchav2()
+	{
 		$data = $this->DefaultParamArr($this->link);
 		$data['cookie'] = (!empty($_POST['cookie']) ? $_POST['cookie'] : '');
 		$data['step'] = '1';
@@ -242,5 +256,4 @@ class nitroflare_com extends DownloadClass {
 
 //[18-10-2015] Written by Th3-822.
 //[13-12-2015] Fixed FreeDL CountDown. - Th3-822
-
-?>
+//[06-06-2020] archdevil87 api download premium
